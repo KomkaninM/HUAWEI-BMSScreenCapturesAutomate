@@ -1,25 +1,28 @@
 import os
 import re
 import subprocess
-import time
 import sys
+import time
 import requests
 from dotenv import load_dotenv
 
+# ----------------------------------------------------
+# 1. Environment & Pre-flight Checks
+# ----------------------------------------------------
 load_dotenv()
+
 TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
-
 if not TOKEN:
-    raise ValueError("CHANNEL_ACCESS_TOKEN missing in .env")
+    print("[-] Error: CHANNEL_ACCESS_TOKEN is missing from your .env file.")
+    sys.exit(1)
 
-# Ensure Python runs the virtual environment's executable
 python_exe = sys.executable
 
-print("[1/4] Starting main bot server...")
-bot_process = subprocess.Popen([python_exe, "main.py"])
+# ----------------------------------------------------
+# 2. Start Pinggy SSH Tunnel
+# ----------------------------------------------------
+print("[1/4] Establishing secure Pinggy SSH tunnel...")
 
-print("[2/4] Starting Pinggy tunnel...")
-# x:debug:4300 instructs Pinggy to launch its local REST dashboard on port 4300
 pinggy_cmd = [
     "ssh",
     "-p", "443",
@@ -36,13 +39,12 @@ pinggy_process = subprocess.Popen(
     stderr=subprocess.STDOUT
 )
 
-print("[*] Waiting for Pinggy URL...")
+print("[*] Waiting for tunnel assignment...")
 pinggy_url = None
-
-# Attempt 1: Read direct console output using safe raw bytes
 start_time = time.time()
-while time.time() - start_time < 12:
-    # Check if process died
+
+# Extract the assigned URL safely (handles binary/ANSI sequences)
+while time.time() - start_time < 15:
     if pinggy_process.poll() is not None:
         break
 
@@ -54,12 +56,11 @@ while time.time() - start_time < 12:
             pinggy_url = match.group(0)
             break
 
-    # Attempt 2: Poll the local status API if port 4300 answered
+    # Fallback to local status REST endpoint if SSH stdout buffer delays
     try:
         res = requests.get("http://127.0.0.1:4300/bin/status", timeout=0.5)
         if res.status_code == 200:
-            data = res.json()
-            urls = data.get("urls", [])
+            urls = res.json().get("urls", [])
             for u in urls:
                 if "pinggy" in u:
                     pinggy_url = u
@@ -72,8 +73,7 @@ while time.time() - start_time < 12:
     time.sleep(0.5)
 
 if not pinggy_url:
-    print("[-] Failed to capture Pinggy URL.")
-    bot_process.terminate()
+    print("[-] Failed to retrieve Pinggy URL. Please check your internet connection or firewall.")
     pinggy_process.terminate()
     sys.exit(1)
 
@@ -81,42 +81,73 @@ if not pinggy_url.startswith("http"):
     pinggy_url = f"https://{pinggy_url}"
 
 webhook_url = f"{pinggy_url}/callback"
-print(f"[+] Tunnel online: {webhook_url}")
+print(f"[+] Tunnel Online: {pinggy_url}")
 
-print("[3/4] Updating LINE Webhook endpoint automatically...")
-headers = {
+# ----------------------------------------------------
+# 3. Start Webhook Server (server.py)
+# ----------------------------------------------------
+print("[2/4] Starting Flask server with local image hosting...")
+
+# Pass the public tunnel base URL into server.py via environment variable
+server_env = os.environ.copy()
+server_env["PUBLIC_TUNNEL_URL"] = pinggy_url
+
+server_process = subprocess.Popen(
+    [python_exe, "server.py"],
+    env=server_env
+)
+
+# Allow Flask server a moment to bind to 127.0.0.1:5000
+time.sleep(1.5)
+
+# ----------------------------------------------------
+# 4. Synchronize LINE Webhook Configuration
+# ----------------------------------------------------
+print("[3/4] Registering Webhook with LINE Platform...")
+line_headers = {
     "Authorization": f"Bearer {TOKEN}",
     "Content-Type": "application/json"
 }
 
 update_res = requests.put(
     "https://api.line.me/v2/bot/channel/webhook/endpoint",
-    headers=headers,
+    headers=line_headers,
     json={"endpoint": webhook_url}
 )
 
 if update_res.status_code == 200:
-    print("[+] LINE Webhook URL successfully updated!")
+    print(f"[+] Successfully registered endpoint: {webhook_url}")
 else:
     print(f"[-] Failed to update LINE webhook ({update_res.status_code}): {update_res.text}")
 
-print("[4/4] Verifying Webhook connection...")
+print("[4/4] Verifying Webhook connectivity...")
 test_res = requests.post(
     "https://api.line.me/v2/bot/channel/webhook/test",
-    headers=headers,
+    headers=line_headers,
     json={"endpoint": webhook_url}
 )
 
 if test_res.status_code == 200:
-    print(f"[+] Verification: {test_res.json()}")
+    print(f"[+] Webhook Test Passed: {test_res.json().get('detail', 'Success')}")
 else:
-    print(f"[!] Test status {test_res.status_code}: {test_res.text}")
+    print(f"[!] Warning: Test verification returned status {test_res.status_code}")
 
-print("\nBot is online and ready for commands.")
+print("\n" + "=" * 55)
+print(" 🚀 BMS Screen Capture Service is LIVE and Ready!")
+print(f" Local Storage:   ./screenshots/")
+print(f" Public Endpoint: {webhook_url}")
+print(" Press Ctrl+C in this console to stop all services.")
+print("=" * 55 + "\n")
 
+# ----------------------------------------------------
+# 5. Process Lifecycle Management
+# ----------------------------------------------------
 try:
-    bot_process.wait()
+    server_process.wait()
 except KeyboardInterrupt:
-    print("\nShutting down bot and tunnel...")
-    bot_process.terminate()
+    print("\n[!] Received shutdown signal. Cleaning up processes...")
+    server_process.terminate()
     pinggy_process.terminate()
+    server_process.wait()
+    pinggy_process.wait()
+    print("[+] All services stopped safely.")

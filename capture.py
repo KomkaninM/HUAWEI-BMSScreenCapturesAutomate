@@ -1,67 +1,31 @@
-import base64
 import os
-import subprocess
+import uuid
 from datetime import datetime
-import requests
-import config
+from mss import mss
+from PIL import Image
 
-def take_native_screenshot(filepath: str) -> str:
-    """Captures primary screen using built-in Windows System.Drawing & User32 DPI awareness."""
-    abs_path = os.path.abspath(filepath)
-    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-
-    ps_command = f"""
-    Add-Type -AssemblyName System.Windows.Forms,System.Drawing;
-
-    $SetDpiDefinition = @'
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    public static extern bool SetProcessDPIAware();
-'@
-    $User32 = Add-Type -MemberDefinition $SetDpiDefinition -Name "User32" -Namespace "Win32" -PassThru;
-    [Win32.User32]::SetProcessDPIAware() | Out-Null;
-
-    $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds;
-    $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height;
-    $graphics = [System.Drawing.Graphics]::FromImage($bmp);
-    $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size);
-    $bmp.Save('{abs_path}', [System.Drawing.Imaging.ImageFormat]::Png);
-    $graphics.Dispose();
-    $bmp.Dispose();
+def capture_screen_local() -> tuple[str, str]:
     """
-
-    res = subprocess.run(
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_command],
-        capture_output=True,
-        text=True,
-    )
-
-    if res.returncode != 0:
-        raise RuntimeError(f"PowerShell capture failed: {res.stderr.strip()}")
-
-    return abs_path
-
-
-def upload_to_imgbb(filepath: str) -> str:
-    """Uploads local image and returns a direct HTTPS image URL."""
-    with open(filepath, "rb") as f:
-        payload = {
-            "key": config.IMGBB_API_KEY,
-            "image": base64.b64encode(f.read()).decode("utf-8"),
-        }
-        res = requests.post(config.IMGBB_UPLOAD_URL, data=payload)
-
-    if res.status_code != 200:
-        raise RuntimeError(f"ImgBB upload failed: {res.text}")
-
-    return res.json()["data"]["url"]
-
-
-def capture_and_upload() -> tuple[str, str]:
-    """Helper: takes screenshot and uploads. Returns (image_url, timestamp_str)."""
+    Captures primary screen using mss + Pillow.
+    Saves as optimized JPEG in ~15-20ms.
+    Returns (filename, formatted_timestamp).
+    """
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join("screenshots", f"shot_{timestamp}.png")
+    rand_token = uuid.uuid4().hex[:8]
+    filename = f"shot_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{rand_token}.jpg"
+    
+    os.makedirs("screenshots", exist_ok=True)
+    filepath = os.path.abspath(os.path.join("screenshots", filename))
 
-    take_native_screenshot(filepath)
-    image_url = upload_to_imgbb(filepath)
-    return image_url, now_str
+    with mss() as sct:
+        # sct.monitors[1] is the primary display (sct.monitors[0] is all monitors combined)
+        primary_monitor = sct.monitors[1]
+        sct_img = sct.grab(primary_monitor)
+
+        # Convert BGRA raw buffer directly to PIL RGB Image
+        img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+        
+        # Save as compressed JPEG (quality=80 reduces 4-6MB PNGs down to ~350KB)
+        img.save(filepath, format="JPEG", quality=80, optimize=True)
+
+    return filename, now_str
