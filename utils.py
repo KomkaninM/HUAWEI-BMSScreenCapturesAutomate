@@ -1,26 +1,33 @@
 import re
 
-def parse_interval(time_str: str) -> tuple[int, str] | tuple[None, str]:
+def parse_schedule_args(arg_string: str) -> tuple[int | None, str, str]:
     """
-    Parses '3s', '10m', '1h', or plain numbers like '3600'.
-    Returns (seconds, human_readable_string) or (None, error_string).
+    Parses arguments for start-capture.
+    Returns: (interval_seconds, interval_desc, note)
     """
-    time_str = time_str.strip().lower()
-    match = re.match(r"^(\d+)([smh]?)$", time_str)
+    arg_string = arg_string.strip()
+    if not arg_string:
+        return None, "Empty argument", ""
+
+    parts = arg_string.split(maxsplit=1)
+    time_token = parts[0]
+    note = parts[1].strip() if len(parts) > 1 else ""
+
+    match = re.fullmatch(r"(\d+)([smh]?)", time_token.lower())
     if not match:
-        return None, f"Invalid format '{time_str}'. Use e.g., 30s, 10m, 1h, or 600."
+        return None, f"Invalid time interval '{time_token}'. Use e.g. 30s, 5m, 1h.", ""
 
-    value, unit = match.groups()
-    num = int(value)
-
-    if num <= 0:
-        return None, "Interval must be greater than 0."
+    val = int(match.group(1))
+    unit = match.group(2)
 
     if unit == "s" or unit == "":
-        return num, f"{num} second(s)"
+        seconds = val
+        desc = f"{val} second(s)"
     elif unit == "m":
-        return num * 60, f"{num} minute(s)"
+        seconds = val * 60
+        desc = f"{val} minute(s)"
     elif unit == "h":
-        return num * 3600, f"{num} hour(s)"
+        seconds = val * 3600
+        desc = f"{val} hour(s)"
 
-    return None, "Unknown time unit."
+    return seconds, desc, note

@@ -3,7 +3,7 @@ from flask import Flask, request
 
 # Import our custom modules
 import state
-from utils import parse_interval
+from utils import parse_schedule_args
 from capture import capture_and_upload
 from line_api import push_image, reply_image, reply_text
 from scheduler import scheduled_worker
@@ -58,29 +58,42 @@ def callback():
             # ------------------------------------------------
             if lower_text.startswith("start-capture") or lower_text.startswith("start capture"):
                 parts = raw_text.split(maxsplit=1)
+                
+                parsed_seconds = 600
+                text_desc = "10 minute(s)"
+                note = ""
 
+                # If user passed arguments: e.g. "start-capture 5m Chiller Check"
                 if len(parts) > 1:
-                    interval_input = parts[1].strip()
-                    parsed_seconds, text_desc = parse_interval(interval_input)
+                    parsed_seconds, text_desc, note = parse_schedule_args(parts[1])
                     if parsed_seconds is None:
-                        reply_text(reply_token, f"❌ Command Error: {text_desc}")
+                        reply_text(reply_token, f"❌ Command Error: {text_desc}\nExample: start-capture 5m Generator Load")
                         continue
-                    with state.state_lock:
-                        state.capture_interval_seconds = parsed_seconds
-                else:
-                    with state.state_lock:
-                        text_desc = f"{state.capture_interval_seconds} second(s)"
 
                 with state.state_lock:
+                    state.capture_interval_seconds = parsed_seconds
+                    state.schedule_note = note
+                    state.schedule_count = 1  # Reset count to 1 for new session
                     state.auto_capture_enabled = True
 
                 state.wake_event.set()
+                
+                confirm_msg = f"▶️ Scheduled capture started!\n• Interval: Every {text_desc}"
+                if note:
+                    confirm_msg += f"\n• Note: {note}"
+                confirm_msg += f"\n• Capturing initial picture (#1) now."
 
-                print(f"[State] Auto-capture STARTED with interval: {text_desc}")
-                reply_text(reply_token, f"▶️ Automated capture started! Capturing initial picture now, then every {text_desc}.")
-
-                # Trigger the very first picture immediately
+                reply_text(reply_token, confirm_msg)
                 threading.Thread(target=process_immediate_first_capture, daemon=True).start()
+
+            elif lower_text in ["stop-capture", "stop capture"]:
+                with state.state_lock:
+                    state.auto_capture_enabled = False
+                    count_summary = state.schedule_count
+                    state.schedule_count = 0
+                    state.schedule_note = ""
+                state.wake_event.set()
+                reply_text(reply_token, f"⏹️ Automated capture stopped. Completed {count_summary} capture(s).")
 
             # ------------------------------------------------
             # Command 2: stop-capture

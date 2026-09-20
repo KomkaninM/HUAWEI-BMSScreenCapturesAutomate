@@ -5,6 +5,7 @@ import sys
 import time
 import requests
 from dotenv import load_dotenv
+from line_api import push_text
 
 # ----------------------------------------------------
 # 1. Environment & Pre-flight Checks
@@ -128,7 +129,10 @@ test_res = requests.post(
 )
 
 if test_res.status_code == 200:
-    print(f"[+] Webhook Test Passed: {test_res.json().get('detail', 'Success')}")
+    print(f"[+] Webhook Test Passed: {test_res.status_code}")
+    
+    # ADD THIS EXACT LINE:
+    push_text("🟢 BMS Screen Capture Bot is ONLINE!\nPC connected and ready for commands.")
 else:
     print(f"[!] Warning: Test verification returned status {test_res.status_code}")
 
