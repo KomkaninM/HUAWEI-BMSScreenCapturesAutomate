@@ -19,20 +19,23 @@ def push_text(message: str) -> bool:
         return False
 
 def push_image(image_url: str, caption: str = "") -> bool:
-    """Sends a proactive push image message to your personal LINE user ID."""
+    """Sends proactive push messages to LINE with text displayed BEFORE the image."""
     headers = {
         "Authorization": f"Bearer {config.CHANNEL_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-    messages = [
-        {
-            "type": "image",
-            "originalContentUrl": image_url,
-            "previewImageUrl": image_url
-        }
-    ]
+    
+    messages = []
+    # 1. Add the text message first (if present)
     if caption:
         messages.append({"type": "text", "text": caption})
+        
+    # 2. Add the image second
+    messages.append({
+        "type": "image",
+        "originalContentUrl": image_url,
+        "previewImageUrl": image_url
+    })
 
     payload = {
         "to": config.USER_ID,
@@ -63,20 +66,23 @@ def reply_text(reply_token: str, message: str) -> bool:
         return False
 
 def reply_image(reply_token: str, image_url: str, caption: str = "") -> bool:
-    """Replies directly to an incoming webhook message event with an image and optional caption."""
+    """Replies to a webhook event with text displayed BEFORE the image."""
     headers = {
         "Authorization": f"Bearer {config.CHANNEL_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-    messages = [
-        {
-            "type": "image",
-            "originalContentUrl": image_url,
-            "previewImageUrl": image_url
-        }
-    ]
+    
+    messages = []
+    # 1. Add the text message first (if present)
     if caption:
         messages.append({"type": "text", "text": caption})
+        
+    # 2. Add the image second
+    messages.append({
+        "type": "image",
+        "originalContentUrl": image_url,
+        "previewImageUrl": image_url
+    })
 
     payload = {
         "replyToken": reply_token,

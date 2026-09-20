@@ -26,7 +26,6 @@ def scheduled_worker():
         with state.state_lock:
             if not state.auto_capture_enabled:
                 continue
-            # Increment sequence counter for scheduled session
             state.schedule_count += 1
             current_count = state.schedule_count
             current_note = state.schedule_note
@@ -36,11 +35,11 @@ def scheduled_worker():
             base_url = os.getenv("PUBLIC_TUNNEL_URL", "http://127.0.0.1:5000").rstrip("/")
             img_url = f"{base_url}/images/{filename}"
 
-            # Format: ⏱️ Scheduled Capture #2: Generator Check (2026-09-20 21:55:00)
-            caption = f"⏱️ Scheduled Capture #{current_count}"
+            # --- NEW CAPTION FORMAT ---
             if current_note:
-                caption += f": {current_note}"
-            caption += f" ({now_str})"
+                caption = f"Scheduled Capture\n{current_note} #{current_count}\nTimestamp: {now_str}"
+            else:
+                caption = f"Scheduled Capture #{current_count}\nTimestamp: {now_str}"
 
             push_image(img_url, caption)
             print(f"[Auto] Pushed image #{current_count}: {img_url}")

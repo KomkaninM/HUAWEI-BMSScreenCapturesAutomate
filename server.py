@@ -25,7 +25,7 @@ def process_manual_trigger(reply_token: str, comment: str):
     try:
         filename, now_str = capture_screen_local()
         img_url = get_public_image_url(filename)
-        note = f"{comment} ({now_str})" if comment else f"Manual capture ({now_str})"
+        note = f"{comment} ({now_str})" if comment else f"Manual capture\nTimestamp: {now_str}"
         reply_image(reply_token, img_url, f"Note: {note}")
         print(f"[Manual] Served image: {img_url}")
     except Exception as e:
@@ -40,10 +40,10 @@ def process_immediate_first_capture():
             note = state.schedule_note
             count = state.schedule_count
 
-        caption = f"⏱️ Scheduled Capture #{count}"
         if note:
-            caption += f": {note}"
-        caption += f" ({now_str})"
+            caption = f"Scheduled Capture\n{note} #{count}\nTimestamp: {now_str}"
+        else:
+            caption = f"Scheduled Capture #{count}\nTimestamp: {now_str}"
 
         push_image(img_url, caption)
         print(f"[Auto] Served initial #{count} image: {img_url}")
