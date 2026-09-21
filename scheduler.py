@@ -1,52 +1,38 @@
-import os
-from datetime import datetime
-import state
-from capture import capture_screen_local
-from line_api import push_image, push_text
+from apscheduler.schedulers.background import BackgroundScheduler
 
-def scheduled_worker():
-    """Background worker thread that handles automated periodic screen captures."""
-    print("[*] Scheduler initialized (Standby mode).")
-    while True:
-        with state.state_lock:
-            is_active = state.auto_capture_enabled
-            interval = state.capture_interval_seconds
+# Initialize the scheduler once globally
+scheduler = BackgroundScheduler()
 
-        if not is_active:
-            state.wake_event.wait(timeout=1)
-            state.wake_event.clear()
-            continue
+def start_automated_captures(interval_seconds: int, note: str, capture_task_function):
+    """Starts precise interval captures using APScheduler."""
+    
+    # 1. Take the first screenshot immediately
+    capture_task_function(note)
+    
+    # 2. Schedule all future captures using exact seconds
+    scheduler.add_job(
+        func=capture_task_function,
+        trigger='interval',
+        seconds=interval_seconds,
+        args=[note],
+        id='bms_capture_task',
+        replace_existing=True 
+    )
+    
+    # 3. Start the background scheduler thread if it isn't running yet
+    if not scheduler.running:
+        scheduler.start()
+        
+    print(f"[*] Precise scheduler started: Capturing every {interval_seconds} seconds.")
 
-        # Wait for the specified interval or until woken up/stopped
-        interrupted = state.wake_event.wait(timeout=interval)
-        state.wake_event.clear()
-        if interrupted:
-            continue
+def stop_automated_captures():
+    """Stops the recurring capture task."""
+    if scheduler.get_job('bms_capture_task'):
+        scheduler.remove_job('bms_capture_task')
+        print("[*] Scheduler stopped.")
+        return True
+    return False
 
-        with state.state_lock:
-            if not state.auto_capture_enabled:
-                continue
-            state.schedule_count += 1
-            current_count = state.schedule_count
-            current_note = state.schedule_note
-
-        try:
-            filename, now_str = capture_screen_local()
-            base_url = os.getenv("PUBLIC_TUNNEL_URL", "http://127.0.0.1:5000").rstrip("/")
-            img_url = f"{base_url}/images/{filename}"
-
-            # --- NEW CAPTION FORMAT ---
-            if current_note:
-                caption = f"Scheduled Capture\n{current_note} #{current_count}\nTimestamp: {now_str}"
-            else:
-                caption = f"Scheduled Capture #{current_count}\nTimestamp: {now_str}"
-
-            push_image(img_url, caption)
-            print(f"[Auto] Pushed image #{current_count}: {img_url}")
-
-        except Exception as e:
-            print(f"[Auto Error] Failed to send scheduled screenshot: {e}")
-            try:
-                push_text(f"⚠️ Scheduled capture #{current_count} failed at {datetime.now().strftime('%H:%M:%S')}.\nError: {e}")
-            except Exception as net_err:
-                print(f"[Critical] Network disconnection: {net_err}")
+def is_scheduler_running():
+    """Returns True if the timer is currently active."""
+    return scheduler.get_job('bms_capture_task') is not None

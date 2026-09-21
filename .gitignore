@@ -1,6 +1,9 @@
 #screenshots
 screenshots/
 
+#.exe files
+*.exe
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
