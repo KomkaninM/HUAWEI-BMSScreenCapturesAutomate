@@ -12,6 +12,18 @@ app = Flask(__name__)
 SCREENSHOT_DIR = os.path.abspath("screenshots")
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
+@app.route("/internal/update-tunnel", methods=["POST"])
+def update_tunnel():
+    """Internal endpoint for launcher.py to sync new Pinggy URLs on reconnect."""
+    data = request.get_json(silent=True) or {}
+    new_url = data.get("url")
+    if new_url:
+        os.environ["PUBLIC_TUNNEL_URL"] = new_url
+        print(f"[Dynamic Update] Server image base URL updated to: {new_url}")
+        return {"status": "success", "url": new_url}, 200
+    return {"status": "error", "message": "Missing url"}, 400
+
+
 @app.route("/images/<filename>", methods=["GET"])
 def serve_image(filename):
     """Serves captured screenshots directly to LINE from local storage."""
@@ -20,6 +32,15 @@ def serve_image(filename):
 def get_public_image_url(filename: str) -> str:
     base_url = os.getenv("PUBLIC_TUNNEL_URL", "http://127.0.0.1:5000").rstrip("/")
     return f"{base_url}/images/{filename}"
+
+def get_latest_screenshot():
+    """Finds the most recently created image in the screenshots folder."""
+    files = [os.path.join(SCREENSHOT_DIR, f) for f in os.listdir(SCREENSHOT_DIR) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    if not files:
+        return None
+    # Return the filename of the most recently modified file
+    latest_file = max(files, key=os.path.getmtime)
+    return os.path.basename(latest_file)
 
 def process_manual_trigger(reply_token: str, comment: str):
     try:
@@ -111,8 +132,21 @@ def callback():
                 comment = parts[1].strip() if len(parts) > 1 else ""
                 threading.Thread(target=process_manual_trigger, args=(reply_token, comment), daemon=True).start()
 
+            elif lower_text in ["recall", "latest"]:
+                latest_filename = get_latest_screenshot()
+                if not latest_filename:
+                    reply_text(reply_token, "❌ No screenshots found on the server.")
+                else:
+                    img_url = get_public_image_url(latest_filename)
+                    reply_image(reply_token, img_url, f"🔄 Recalled: {latest_filename}")
+                    print(f"[Recall] Served latest image: {img_url}")
+
+                    
             else:
-                reply_text(reply_token, "❌ Available commands:\n• start-capture [time] [note]\n• stop-capture\n• capture [note]")
+                # Group Chat Spam Prevention Toggle
+                show_errors = os.getenv("REPLY_UNKNOWN_COMMANDS", "False").lower() in ["true", "1", "yes"]
+                if show_errors:
+                    reply_text(reply_token, "❌ Available commands:\n• start-capture [time] [note]\n• stop-capture\n• capture [note]\n• get-id")
 
     return "OK", 200
 
