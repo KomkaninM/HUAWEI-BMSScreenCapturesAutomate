@@ -89,7 +89,7 @@ def main():
         notify_flask_of_new_url(public_url)
         if sync_line_webhook(public_url):
             print("[+] LINE Webhook synced successfully.")
-            push_text("🟢 BMS Screen Capture Bot is ONLINE (Ngrok 24/7)!\nReady for commands.")
+            push_text("🟢 BMS Screen Capture Bot is ONLINE!\nReady for commands.")
         else:
             print("[!] Warning: Webhook registration check failed.")
 
