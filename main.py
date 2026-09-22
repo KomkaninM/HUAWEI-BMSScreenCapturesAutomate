@@ -86,24 +86,21 @@ def callback():
                 reply_text(reply_token, confirm_msg)
                 threading.Thread(target=process_immediate_first_capture, daemon=True).start()
 
-            elif lower_text in ["stop-capture", "stop capture"]:
-                with state.state_lock:
-                    state.auto_capture_enabled = False
-                    count_summary = state.schedule_count
-                    state.schedule_count = 0
-                    state.schedule_note = ""
-                state.wake_event.set()
-                reply_text(reply_token, f"⏹️ Automated capture stopped. Completed {count_summary} capture(s).")
-
             # ------------------------------------------------
             # Command 2: stop-capture
             # ------------------------------------------------
             elif lower_text in ["stop-capture", "stop capture"]:
                 with state.state_lock:
                     state.auto_capture_enabled = False
+                    count_summary = state.schedule_count
+                    
+                    # Reset variables for the next time it starts
+                    state.schedule_count = 0
+                    state.schedule_note = ""
+                    
                 state.wake_event.set()
-
                 print("[State] Auto-capture STOPPED.")
+                reply_text(reply_token, f"⏹️ Automated capture stopped. Completed {count_summary} capture(s).")
                 reply_text(reply_token, "⏹️ Automated capture stopped. Scheduled captures are paused.")
 
             # ------------------------------------------------
@@ -120,6 +117,20 @@ def callback():
                     daemon=True,
                 ).start()
 
+
+            # ------------------------------------------------
+            # Get ID
+            # ------------------------------------------------
+            elif lower_text == "get-id":
+                source = event.get("source", {})
+                user_id = source.get("userId", "Not found")
+                group_id = source.get("groupId")
+                
+                if group_id:
+                    reply_text(reply_token, f"Group ID:\n{group_id}\n\nUser ID:\n{user_id}")
+                else:
+                    reply_text(reply_token, f"User ID:\n{user_id}")
+
             # ------------------------------------------------
             # Invalid Command Fallback
             # ------------------------------------------------
@@ -130,6 +141,7 @@ def callback():
                     "• start-capture [time] (e.g. start-capture 30s, 10m, 1h, or 3600)\n"
                     "• stop-capture\n"
                     "• capture [optional note]"
+                    "• get-id"
                 )
                 reply_text(reply_token, error_msg)
 

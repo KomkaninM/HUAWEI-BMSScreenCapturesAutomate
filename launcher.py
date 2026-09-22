@@ -10,6 +10,7 @@ load_dotenv(override=True)
 
 CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
 NGROK_DOMAIN = os.getenv("NGROK_DOMAIN")
+NGROK_AUTHTOKEN = os.getenv("NGROK_AUTHTOKEN") # <-- Added this
 
 LINE_WEBHOOK_ENDPOINT_URL = "https://api.line.me/v2/bot/channel/webhook/endpoint"
 LINE_WEBHOOK_TEST_URL = "https://api.line.me/v2/bot/channel/webhook/test"
@@ -23,6 +24,16 @@ def start_flask_server():
     print("[*] Starting local Flask server...")
     return subprocess.Popen([sys.executable, "server.py"])
 
+def configure_ngrok_authtoken():
+    # Automatically apply the token if it is provided in the .env file
+    if NGROK_AUTHTOKEN:
+        print("[*] Applying Ngrok Authtoken from .env...")
+        subprocess.run(
+            [os.path.abspath("ngrok.exe"), "config", "add-authtoken", NGROK_AUTHTOKEN], 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+        )
+
 def open_ngrok_tunnel():
     if not NGROK_DOMAIN:
         raise ValueError("NGROK_DOMAIN is missing from your .env file!")
@@ -32,12 +43,13 @@ def open_ngrok_tunnel():
         os.path.abspath("ngrok.exe"),
         "http",
         f"--domain={NGROK_DOMAIN}",
+        "--log=stderr",      
+        "--log-level=error", 
         "5000"
     ]
     
-    # Ngrok UI runs in the background
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-    time.sleep(3) # Give Ngrok a few seconds to negotiate the connection
+    proc = subprocess.Popen(cmd)
+    time.sleep(3) 
     
     public_url = f"https://{NGROK_DOMAIN}"
     return proc, public_url
@@ -58,12 +70,20 @@ def notify_flask_of_new_url(public_url):
         print(f"[!] Could not notify local Flask server: {e}")
 
 def main():
+    # 1. Apply Authtoken first
+    configure_ngrok_authtoken()
+    
     flask_proc = start_flask_server()
     time.sleep(2)
 
     tunnel_proc = None
     try:
         tunnel_proc, public_url = open_ngrok_tunnel()
+        
+        if tunnel_proc.poll() is not None:
+            print("[!] Ngrok failed to start. Check the error messages above.")
+            return
+
         print(f"[+] Tunnel Online: {public_url}")
 
         notify_flask_of_new_url(public_url)
@@ -76,9 +96,17 @@ def main():
         print("\n=======================================================")
         print(f" 🚀 Monitor active on Ngrok. PID: {tunnel_proc.pid}")
         print(f" URL: {public_url}")
+        print(" Press CTRL+C to stop.")
         print("=======================================================\n")
 
-        tunnel_proc.wait()
+        while True:
+            if tunnel_proc.poll() is not None:
+                print("\n[!] Ngrok process crashed or stopped unexpectedly.")
+                break
+            if flask_proc.poll() is not None:
+                print("\n[!] Flask server process crashed or stopped unexpectedly.")
+                break
+            time.sleep(1)
 
     except KeyboardInterrupt:
         print("\n[*] Stopping services...")
