@@ -1,96 +1,87 @@
+import os
 import requests
-import config
+from dotenv import load_dotenv
 
-def push_text(message: str) -> bool:
-    """Sends a proactive push text message directly to your personal LINE user ID."""
-    headers = {
-        "Authorization": f"Bearer {config.CHANNEL_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "to": config.USER_ID,
-        "messages": [{"type": "text", "text": message}]
-    }
-    try:
-        res = requests.post(config.LINE_PUSH_URL, headers=headers, json=payload, timeout=5)
-        return res.status_code == 200
-    except requests.RequestException as e:
-        print(f"[-] Failed to push text message: {e}")
-        return False
+load_dotenv(override=True)
 
-def push_image(image_url: str, caption: str = "") -> bool:
-    """Sends proactive push messages to LINE with text displayed BEFORE the image."""
-    headers = {
-        "Authorization": f"Bearer {config.CHANNEL_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    messages = []
-    # 1. Add the text message first (if present)
-    if caption:
-        messages.append({"type": "text", "text": caption})
-        
-    # 2. Add the image second
-    messages.append({
-        "type": "image",
-        "originalContentUrl": image_url,
-        "previewImageUrl": image_url
-    })
+CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
+# Reads GROUP_ID first; if empty, falls back to USER_ID
+TARGET_ID = os.getenv("GROUP_ID") or os.getenv("USER_ID") 
+
+LINE_PUSH_ENDPOINT = "https://api.line.me/v2/bot/message/push"
+LINE_REPLY_ENDPOINT = "https://api.line.me/v2/bot/message/reply"
+
+headers = {
+    "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}",
+    "Content-Type": "application/json"
+}
+
+def push_image(image_url: str, caption: str = "Screen Capture"):
+    if not image_url:
+        push_text(caption)
+        return
+
+    if not TARGET_ID:
+        print("❌ [LINE API Error] Cannot push! GROUP_ID or USER_ID is missing in .env")
+        return
 
     payload = {
-        "to": config.USER_ID,
-        "messages": messages
+        "to": TARGET_ID,
+        "messages": [
+            {
+                "type": "image",
+                "originalContentUrl": image_url,
+                "previewImageUrl": image_url
+            },
+            {
+                "type": "text",
+                "text": caption
+            }
+        ]
     }
     try:
-        res = requests.post(config.LINE_PUSH_URL, headers=headers, json=payload, timeout=10)
-        return res.status_code == 200
-    except requests.RequestException as e:
-        print(f"[-] Failed to push image message: {e}")
-        return False
+        response = requests.post(LINE_PUSH_ENDPOINT, headers=headers, json=payload)
+        if response.status_code != 200:
+            print(f"❌ [LINE Push Error] Failed to push to {TARGET_ID}")
+            print(f"❌ [LINE Push Error] Code: {response.status_code} | Details: {response.text}")
+    except Exception as e:
+        print(f"[Line API Exception] {e}")
 
-def reply_text(reply_token: str, message: str) -> bool:
-    """Replies directly to an incoming webhook message event with text."""
-    headers = {
-        "Authorization": f"Bearer {config.CHANNEL_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+def push_text(text: str):
+    if not TARGET_ID:
+        print("❌ [LINE API Error] Cannot push text! TARGET_ID is missing in .env")
+        return
     payload = {
-        "replyToken": reply_token,
-        "messages": [{"type": "text", "text": message}]
+        "to": TARGET_ID,
+        "messages": [{"type": "text", "text": text}]
     }
     try:
-        res = requests.post(config.LINE_REPLY_URL, headers=headers, json=payload, timeout=5)
-        return res.status_code == 200
-    except requests.RequestException as e:
-        print(f"[-] Failed to send reply text: {e}")
-        return False
+        response = requests.post(LINE_PUSH_ENDPOINT, headers=headers, json=payload)
+        if response.status_code != 200:
+            print(f"❌ [LINE Push Error] Code: {response.status_code} | Details: {response.text}")
+    except Exception as e:
+        print(f"[Line API Exception] {e}")
 
-def reply_image(reply_token: str, image_url: str, caption: str = "") -> bool:
-    """Replies to a webhook event with text displayed BEFORE the image."""
-    headers = {
-        "Authorization": f"Bearer {config.CHANNEL_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    messages = []
-    # 1. Add the text message first (if present)
-    if caption:
-        messages.append({"type": "text", "text": caption})
-        
-    # 2. Add the image second
-    messages.append({
-        "type": "image",
-        "originalContentUrl": image_url,
-        "previewImageUrl": image_url
-    })
-
+def reply_image(reply_token: str, image_url: str, caption: str = "Screen Capture"):
     payload = {
         "replyToken": reply_token,
-        "messages": messages
+        "messages": [
+            {
+                "type": "image",
+                "originalContentUrl": image_url,
+                "previewImageUrl": image_url
+            },
+            {
+                "type": "text",
+                "text": caption
+            }
+        ]
     }
-    try:
-        res = requests.post(config.LINE_REPLY_URL, headers=headers, json=payload, timeout=10)
-        return res.status_code == 200
-    except requests.RequestException as e:
-        print(f"[-] Failed to send reply image: {e}")
-        return False
+    requests.post(LINE_REPLY_ENDPOINT, headers=headers, json=payload)
+
+def reply_text(reply_token: str, text: str):
+    payload = {
+        "replyToken": reply_token,
+        "messages": [{"type": "text", "text": text}]
+    }
+    requests.post(LINE_REPLY_ENDPOINT, headers=headers, json=payload)

@@ -1,5 +1,11 @@
-#screenshots
-screenshots/
+
+# My custom files
+assets/*
+!assets/.gitkeep
+
+assets/*
+!assets/.gitkeep
+
 
 #.exe files
 *.exe
