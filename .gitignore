@@ -6,6 +6,8 @@ assets/*
 assets/*
 !assets/.gitkeep
 
+screenshots/
+
 
 #.exe files
 *.exe
