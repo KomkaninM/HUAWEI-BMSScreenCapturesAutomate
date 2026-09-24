@@ -1,26 +1,63 @@
-import os
+import time
+import threading
 import pyautogui
 
-# Anchor image cropped from the Schneider login screen (e.g., "Log in" button)
-ANCHOR_PATH = os.path.abspath(os.path.join("assets", "login_anchor.png"))
+from config import (
+    LOGOUT_ANCHOR_PATH, 
+    DETECTOR_INTERVAL_SEC, 
+    CONFIDENCE_THRESHOLD
+)
+from macro_player import execute_macro
 
-def is_logged_out() -> bool:
-    """
-    Returns True if the Schneider login anchor image is visible on the screen.
-    """
-    if not os.path.exists(ANCHOR_PATH):
-        print(f"[Detector Warning] Anchor file missing at {ANCHOR_PATH}")
+
+def is_logged_out():
+    """Scans the screen once for the logout anchor."""
+    if not LOGOUT_ANCHOR_PATH.exists():
+        print(f"[Detector] ⚠️ Missing anchor image: {LOGOUT_ANCHOR_PATH}")
         return False
-        
+
     try:
-        # confidence=0.8 requires opencv-python installed
-        location = pyautogui.locateOnScreen(ANCHOR_PATH, confidence=0.8)
-        return location is not None
+        loc = pyautogui.locateOnScreen(
+            str(LOGOUT_ANCHOR_PATH), 
+            confidence=CONFIDENCE_THRESHOLD
+        )
+        return loc is not None
     except Exception as e:
-        # Fallback if opencv-python is not installed
+        print(f"[Detector] OpenCV matching error: {e}")
+        return False
+
+
+def detector_loop():
+    """Continuous background loop for monitoring the screen."""
+    print(f"[Detector] Started. Scanning every {DETECTOR_INTERVAL_SEC}s...")
+    
+    while True:
         try:
-            location = pyautogui.locateOnScreen(ANCHOR_PATH)
-            return location is not None
-        except Exception as inner_e:
-            print(f"[Detector Error] {inner_e}")
-            return False
+            if is_logged_out():
+                print("[Detector] 🚨 Logout screen detected! Triggering auto-login...")
+                
+                # Execute the default macro from .env (no arguments needed)
+                success, msg = execute_macro()
+                
+                if success:
+                    print(f"[Detector] ✅ Re-login successful: {msg}")
+                    # Sleep extra time to let the dashboard fully load before scanning again
+                    time.sleep(15) 
+                else:
+                    print(f"[Detector] ❌ Re-login failed: {msg}")
+                    # Sleep briefly before retrying so we don't spam the macro
+                    time.sleep(10)
+            else:
+                pass # Still logged in, do nothing
+                
+        except Exception as e:
+            print(f"[Detector] Unexpected loop error: {e}")
+            
+        time.sleep(DETECTOR_INTERVAL_SEC)
+
+
+def start_detector_thread():
+    """Spawns the detector loop in a daemon thread so it runs in the background."""
+    thread = threading.Thread(target=detector_loop, daemon=True, name="LogoutDetector")
+    thread.start()
+    return thread

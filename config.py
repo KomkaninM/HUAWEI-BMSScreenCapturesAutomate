@@ -1,15 +1,39 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+# --- Directory Setup ---
+BASE_DIR = Path(__file__).resolve().parent
 
-CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
-USER_ID = os.getenv("USER_ID")
+# Load environment variables from the .env file in the root directory
+load_dotenv(BASE_DIR / ".env")
 
-if not CHANNEL_ACCESS_TOKEN or not USER_ID:
-    raise ValueError("Missing CHANNEL_ACCESS_TOKEN or USER_ID in .env file.")
+# --- LINE API Credentials ---
+CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN", "")
+USER_ID = os.getenv("USER_ID", "")
+GROUP_ID = os.getenv("GROUP_ID", "")
 
+# --- ngrok Settings ---
+NGROK_AUTHTOKEN = os.getenv("NGROK_AUTHTOKEN", "")
+NGROK_DOMAIN = os.getenv("NGROK_DOMAIN", "")
 
-LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
-LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
-IMGBB_UPLOAD_URL = "https://api.imgbb.com/1/upload"
+# --- Server & Webhook Settings ---
+PORT = int(os.getenv("PORT", 5000))
+REPLY_UNKNOWN_COMMANDS = os.getenv("REPLY_UNKNOWN_COMMANDS", "False").strip().lower() in [
+    "true",
+    "1",
+    "yes",
+]
+
+# --- Macro Configuration ---
+# Matches LOGIN_MACRO_SCRIPT from your .env template, fallback to DEFAULT_LOGIN_MACRO or "login_bms.json"
+DEFAULT_LOGIN_MACRO = os.getenv(
+    "LOGIN_MACRO_SCRIPT", os.getenv("DEFAULT_LOGIN_MACRO", "login_bms.json")
+)
+MACROS_DIR = BASE_DIR / "scripts" / "macros"
+DEFAULT_LOGIN_MACRO_PATH = MACROS_DIR / DEFAULT_LOGIN_MACRO
+
+# --- Detector Configuration ---
+LOGOUT_ANCHOR_PATH = BASE_DIR / "assets" / "logout_anchor.png"
+DETECTOR_INTERVAL_SEC = int(os.getenv("DETECTOR_INTERVAL_SEC", 10))
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", 0.8))

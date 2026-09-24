@@ -2,58 +2,34 @@ import os
 import threading
 import time
 import re 
-import subprocess
 import sys
 from flask import Flask, request, send_from_directory
 
+import config
 import state
 from utils import parse_schedule_args
 from capture import capture_screen_local
 from line_api import push_image, reply_image, reply_text
 from scheduler import start_automated_captures, stop_automated_captures, is_scheduler_running
 import pyautogui
+
 from detector import is_logged_out
+from macro_player import execute_macro
 
 app = Flask(__name__)
 SCREENSHOT_DIR = os.path.abspath("screenshots")
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
-
-def execute_login_macro() -> bool:
-    """Executes the login macro subprocess and waits for UI settle."""
-    macro_filename = os.getenv("LOGIN_MACRO_SCRIPT", "DH08C.py")
-    script_path = os.path.abspath(os.path.join("PrototypeScripts", macro_filename))
-    
-    if not os.path.exists(script_path):
-        print(f"[Login Macro] Script not found: {script_path}")
-        return False
-        
-    try:
-        result = subprocess.run(
-            [sys.executable, script_path],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        if result.returncode == 0:
-            print("[Login Macro] Executed successfully.")
-            time.sleep(1)  # Let BMS finish loading the dashboard
-            return True
-        else:
-            print(f"[Login Macro Error] Exit code {result.returncode}:\n{result.stderr}")
-            return False
-    except Exception as e:
-        print(f"[Login Macro Exception] {e}")
-        return False
-
 def ensure_logged_in() -> bool:
     """
-    Silent guard: checks if logged out, relogs if necessary.
+    Silent guard: checks if logged out, relogs via JSON macro in background.
     Returns True if a relogin was performed.
     """
     if is_logged_out():
         print("[Guard] Logout detected. Relogging in background...")
-        execute_login_macro()
+        success, msg = execute_macro()
+        if success:
+            time.sleep(1) # Let BMS finish loading the dashboard
         return True
     return False
 
@@ -62,16 +38,13 @@ def process_close_menu(reply_token: str):
     try:
         reply_text(reply_token, "🔄 Closing BMS menu...")
         
-        # Click the menu button
         pyautogui.click(x=77, y=273)
         time.sleep(0.2)
         pyautogui.click(x=1394, y=263) 
         print("[Close Menu] Clicked at (77, 273)")
         
-        # Wait 1 second for the slide/fade animation to finish
         time.sleep(1)
         
-        # Capture and push confirmation
         filename, now_str = capture_screen_local()
         img_url = get_public_image_url(filename)
         push_image(img_url, f"✅ Menu closed.\nTimestamp: {now_str}")
@@ -82,18 +55,17 @@ def process_close_menu(reply_token: str):
         push_image(None, f"⚠️ Failed to close menu: {e}")
 
 def process_login_command(reply_token: str):
-    """Handles manual 'login' command from LINE with progress feedback."""
+    """Handles manual 'login' command from LINE."""
     try:
         if not is_logged_out():
             reply_text(reply_token, "ℹ️ BMS is already logged in. Capturing current screen...")
         else:
-            reply_text(reply_token, "🔄 Logout detected. Running login macro...")
-            success = execute_login_macro()
+            reply_text(reply_token, "🔄 Logout detected. Running JSON login macro...")
+            success, msg = execute_macro()
             if not success:
-                push_image(None, "❌ BMS login macro failed. Please check host console.")
+                push_image(None, f"❌ BMS login macro failed: {msg}")
                 return
 
-        # Verification screenshot push
         time.sleep(1)
         filename, now_str = capture_screen_local()
         img_url = get_public_image_url(filename)
@@ -106,7 +78,6 @@ def process_login_command(reply_token: str):
 def process_manual_trigger(reply_token: str, note_text: str = ""):
     """Handles manual 'capture [note]' command."""
     try:
-        # Silently relog first so the user doesn't get a login page image
         relogged = ensure_logged_in()
         
         filename, now_str = capture_screen_local()
@@ -123,10 +94,8 @@ def process_manual_trigger(reply_token: str, note_text: str = ""):
 def perform_scheduled_capture(note_text):
     """The recurring background capture task."""
     try:
-        # Check and relog quietly if needed
         ensure_logged_in()
 
-        # Capture the active screen
         filename, now_str = capture_screen_local()
         img_url = get_public_image_url(filename)
         
@@ -137,7 +106,6 @@ def perform_scheduled_capture(note_text):
         base_note = f"{note_text} " if note_text else ""
         caption = f"Scheduled Capture\n{base_note}#{count}\nTimestamp: {now_str}"
 
-        # Sends exactly one image push
         push_image(img_url, caption)
         print(f"[Auto] Pushed scheduled capture #{count}: {img_url}")
         
@@ -192,7 +160,7 @@ def serve_image(filename):
     return send_from_directory(SCREENSHOT_DIR, filename)
 
 def get_public_image_url(filename: str) -> str:
-    base_url = os.getenv("PUBLIC_TUNNEL_URL", "http://127.0.0.1:5000").rstrip("/")
+    base_url = os.getenv("PUBLIC_TUNNEL_URL", f"http://127.0.0.1:{config.PORT}").rstrip("/")
     return f"{base_url}/images/{filename}"
 
 @app.route("/callback", methods=["POST"])
@@ -213,7 +181,6 @@ def callback():
             # --- START AUTOMATED CAPTURE ---
             if lower_text.startswith("start-capture"):
                 parts = raw_text.split()
-                
                 total_seconds = 30 * 60
                 human_readable = "30 minutes"
                 
@@ -273,6 +240,17 @@ def callback():
                     daemon=True
                 ).start()
 
+            # --- DYNAMIC MACRO COMMAND ---
+            elif lower_text.startswith("macro "):
+                target_name = lower_text.split(" ", 1)[1].strip()
+                reply_text(reply_token, f"⏳ Running macro: {target_name}...")
+
+                def _run_dynamic():
+                    success, msg = execute_macro(target_name)
+                    print(f"[Macro Execution] {'✅' if success else '❌'} {msg}")
+
+                threading.Thread(target=_run_dynamic, daemon=True).start()
+
             # --- CLOSE BMS MENU COMMAND ---
             elif lower_text == "close-menu":
                 threading.Thread(
@@ -291,11 +269,10 @@ def callback():
             else:
                 show_errors = os.getenv("REPLY_UNKNOWN_COMMANDS", "False").lower() in ["true", "1", "yes"]
                 if show_errors:
-                    reply_text(reply_token, "❌ Available commands:\n• start-capture [time] [note]\n• stop-capture\n• capture [note]\n• recall [number]\n• login\n• close-menu")
+                    reply_text(reply_token, "❌ Available commands:\n• start-capture [time] [note]\n• stop-capture\n• capture [note]\n• recall [number]\n• login\n• macro [name]\n• close-menu")
 
     return "OK", 200
 
 if __name__ == "__main__":
-    # Dynamically select port for concurrent bot testing (defaults to 5000)
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    print(f"Starting server on port {config.PORT}...")
+    app.run(host="0.0.0.0", port=config.PORT, debug=False, use_reloader=False)
