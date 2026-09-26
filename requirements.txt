@@ -4,3 +4,6 @@ python-dotenv==1.0.1
 mss>=9.0.0
 pillow>=10.0.0
 APScheduler
+pynput
+pyautogui
+opencv-python

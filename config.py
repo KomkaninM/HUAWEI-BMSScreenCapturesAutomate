@@ -26,12 +26,19 @@ REPLY_UNKNOWN_COMMANDS = os.getenv("REPLY_UNKNOWN_COMMANDS", "False").strip().lo
 ]
 
 # --- Macro Configuration ---
-# Matches LOGIN_MACRO_SCRIPT from your .env template, fallback to DEFAULT_LOGIN_MACRO or "login_bms.json"
 DEFAULT_LOGIN_MACRO = os.getenv(
     "LOGIN_MACRO_SCRIPT", os.getenv("DEFAULT_LOGIN_MACRO", "login_bms.json")
 )
 MACROS_DIR = BASE_DIR / "scripts" / "macros"
 DEFAULT_LOGIN_MACRO_PATH = MACROS_DIR / DEFAULT_LOGIN_MACRO
+
+# --- Auto Logout Configuration ---
+ENABLE_AUTO_LOGOUT = os.getenv("ENABLE_AUTO_LOGOUT", "False").strip().lower() in [
+    "true",
+    "1",
+    "yes",
+]
+LOGOUT_MACRO_SCRIPT = os.getenv("LOGOUT_MACRO_SCRIPT", "logout.json")
 
 # --- Detector Configuration ---
 LOGOUT_ANCHOR_PATH = BASE_DIR / "assets" / "logout_anchor.png"

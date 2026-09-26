@@ -1,12 +1,11 @@
 
 # My custom files
-assets/*
-!assets/.gitkeep
 
 scripts/*
 !scripts/macro_recorder.py
 !scripts/macro_player.py
 !scripts/position_finder.py
+!scripts/add_generator.py
 
 screenshots/
 

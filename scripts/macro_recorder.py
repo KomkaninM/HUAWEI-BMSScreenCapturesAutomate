@@ -4,7 +4,10 @@ from pathlib import Path
 from pynput import mouse, keyboard
 
 DEFAULT_POST_DELAY = 0.3
-OUTPUT_FILE = Path("scripts/macros/login_bms.json")
+
+# Resolves to the 'scripts' folder, then looks for 'macros/recorder.json'
+SCRIPTS_DIR = Path(__file__).resolve().parent
+OUTPUT_FILE = SCRIPTS_DIR / "macros" / "recorder.json"
 
 events = []
 char_buffer = []
@@ -91,7 +94,7 @@ def on_press(key):
 
 def main():
     print("=" * 60)
-    print("🎥 BMS MACRO RECORDER (Word Aggregator)")
+    print("🎥 BMS MACRO RECORDER")
     print("=" * 60)
     print("1. Switch to your BMS login target.")
     print("2. Type words normally (e.g. 'HUA', 'Admin', passwords).")
@@ -127,7 +130,7 @@ def main():
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(macro_payload, f, indent=2)
 
-    print(f"\n✅ Saved {len(events)} steps to: {OUTPUT_FILE}")
+    print(f"\n✅ Saved {len(events)} steps to: {OUTPUT_FILE.resolve()}")
 
 if __name__ == "__main__":
     main()
