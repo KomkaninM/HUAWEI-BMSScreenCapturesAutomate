@@ -1,11 +1,13 @@
 
 # My custom files
 
-scripts/*
+!scripts/*
 !scripts/macro_recorder.py
 !scripts/macro_player.py
 !scripts/position_finder.py
 !scripts/add_generator.py
+
+scripts/macros/*
 !scripts/macros/_base.json
 !scripts/macros/clear.json
 !scripts/macros/logout.json

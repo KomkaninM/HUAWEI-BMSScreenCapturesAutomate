@@ -1,0 +1,37 @@
+{
+  "name": "Recorded BMS Reset and Login",
+  "description": "Kills Edge and launches InPrivate to prevent session restore",
+  "default_post_delay": 0.3,
+  "steps": [
+    {
+      "action": "hotkey",
+      "keys": ["win", "r"],
+      "post_delay": 0.6
+    },
+    {
+      "action": "type_text",
+      "text": "cmd /c taskkill /f /im msedge.exe",
+      "post_delay": 0.2
+    },
+    {
+      "action": "press_key",
+      "key": "enter",
+      "post_delay": 1.5
+    },
+    {
+      "action": "hotkey",
+      "keys": ["win", "r"],
+      "post_delay": 0.6
+    },
+    {
+      "action": "type_text",
+      "text": "msedge --start-maximized --inprivate https://10.121.48.14",
+      "post_delay": 0.2
+    },
+    {
+      "action": "press_key",
+      "key": "enter",
+      "post_delay": 2.5
+    }
+  ]
+}

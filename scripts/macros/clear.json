@@ -1,0 +1,64 @@
+{
+  "name": "Recorded BMS Login",
+  "description": "Generated on 2026-09-24 11:02:20",
+  "default_post_delay": 0.3,
+  "steps": [
+    {
+      "action": "click_coord",
+      "x": 1778,
+      "y": 1105,
+      "button": "left",
+      "post_delay": 0.05
+    },
+    {
+      "action": "click_coord",
+      "x": 1778,
+      "y": 1105,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "press_key",
+      "key": "backspace",
+      "post_delay": 0.3
+    },
+    {
+      "action": "click_coord",
+      "x": 1770,
+      "y": 1244,
+      "button": "left",
+      "post_delay": 0.05
+    },
+    {
+      "action": "click_coord",
+      "x": 1770,
+      "y": 1244,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "press_key",
+      "key": "backspace",
+      "post_delay": 0.3
+    },
+    {
+      "action": "click_coord",
+      "x": 1779,
+      "y": 1394,
+      "button": "left",
+      "post_delay": 0.05
+    },
+    {
+      "action": "click_coord",
+      "x": 1779,
+      "y": 1394,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "press_key",
+      "key": "backspace",
+      "post_delay": 0.3
+    }
+  ]
+}

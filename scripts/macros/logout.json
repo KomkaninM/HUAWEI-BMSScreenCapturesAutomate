@@ -1,0 +1,21 @@
+{
+  "name": "Recorded BMS Login",
+  "description": "Generated on 2026-09-24 11:28:33",
+  "default_post_delay": 0.3,
+  "steps": [
+    {
+      "action": "click_coord",
+      "x": 2744,
+      "y": 270,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "click_coord",
+      "x": 2427,
+      "y": 1202,
+      "button": "left",
+      "post_delay": 0.3
+    }
+  ]
+}

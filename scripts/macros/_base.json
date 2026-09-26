@@ -1,0 +1,64 @@
+{
+  "name": "Recorded BMS Login",
+  "description": "Generated on 2026-09-24 18:52:12",
+  "default_post_delay": 0.3,
+  "steps": [
+    {
+      "action": "click_coord",
+      "x": 1779,
+      "y": 1109,
+      "button": "left",
+      "post_delay": 0.1
+    },
+    {
+      "action": "type_text",
+      "text": "Huawei",
+      "post_delay": 0.1
+    },
+    {
+      "action": "click_coord",
+      "x": 1792,
+      "y": 1259,
+      "button": "left",
+      "post_delay": 0.1
+    },
+    {
+      "action": "type_text",
+      "text": "Huawei@1234",
+      "post_delay": 0.1
+    },
+    {
+      "action": "press_key",
+      "key": "enter",
+      "post_delay": 0.7
+    },
+    {
+      "action": "click_coord",
+      "x": 143,
+      "y": 803,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "click_coord",
+      "x": 148,
+      "y": 623,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "click_coord",
+      "x": 148,
+      "y": 626,
+      "button": "left",
+      "post_delay": 0.3
+    },
+    {
+      "action": "click_coord",
+      "x": 150,
+      "y": 699,
+      "button": "left",
+      "post_delay": 0.3
+    }
+  ]
+}
