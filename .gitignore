@@ -6,6 +6,10 @@ scripts/*
 !scripts/macro_player.py
 !scripts/position_finder.py
 !scripts/add_generator.py
+!scripts/macros/_base.json
+!scripts/macros/clear.json
+!scripts/macros/logout.json
+!scripts/macros/open-bms.json
 
 screenshots/
 
